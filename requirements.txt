@@ -1,0 +1,4 @@
+qrcode[pil]
+PyQt5
+flask
+
