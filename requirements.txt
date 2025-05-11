@@ -1,4 +1,6 @@
 qrcode[pil]
 PyQt5
-flask
+Flask
+humanize
+urllib3
 

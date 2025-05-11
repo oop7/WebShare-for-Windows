@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebShare</title>
+    <link rel="icon" href="{{ url_for('get_icon', filename='icon48.png') }}" type="image/png">
+    <style>
+        body {
+            background-color: #11171d;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1e2730;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        img.logo {
+            display: block;
+            margin: 0 auto;
+            max-width: 150px;
+            padding-top: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        form {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #2c3440;
+            border-radius: 8px;
+        }
+        .file-input-container {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        .file-input {
+            opacity: 0;
+            width: 0.1px;
+            height: 0.1px;
+            position: absolute;
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #4a5568;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .file-input-label:hover {
+            background-color: #5a6678;
+        }
+        .selected-file {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #a0aec0;
+        }
+        .upload-btn {
+            background-color: #ffffff;
+            color: #11171d;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .upload-btn:hover {
+            background-color: #e2e8f0;
+        }
+        .upload-btn:disabled {
+            background-color: #a0aec0;
+            cursor: not-allowed;
+        }
+        .files-container {
+            margin-top: 20px;
+        }
+        .files-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: #2c3440;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .file-item:hover {
+            background-color: #3c4450;
+        }
+        .file-link {
+            color: white;
+            text-decoration: none;
+            flex-grow: 1;
+        }
+        .file-link:hover {
+            text-decoration: underline;
+        }
+        .file-size {
+            margin-left: 10px;
+            color: #a0aec0;
+            font-size: 14px;
+        }
+        .delete-btn {
+            background-color: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .delete-btn:hover {
+            background-color: #c53030;
+        }
+        .progress-container {
+            width: 100%;
+            height: 20px;
+            background-color: #2d3748;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4299e1;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .alert-success {
+            background-color: #2f855a;
+            color: white;
+        }
+        .alert-error {
+            background-color: #e53e3e;
+            color: white;
+        }
+        .empty-message {
+            text-align: center;
+            color: #a0aec0;
+            padding: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background-color: #2c3440;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background-color: #3c4450;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .text-area {
+            width: 100%;
+            height: 150px;
+            background-color: #2d3748;
+            color: white;
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            resize: vertical;
+            font-family: Arial, sans-serif;
+        }
+        .clipboard-container {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .clipboard-btn {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 15px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background-color 0.3s;
+        }
+        .clipboard-btn:hover {
+            background-color: #2c5282;
+        }
+        .shared-text {
+            background-color: #2d3748;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .shared-text-container {
+            margin-top: 20px;
+        }
+        .shared-text-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .shared-text-title {
+            font-weight: bold;
+            color: #a0aec0;
+        }
+        .small-btn {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img class="logo" src="{{ url_for('get_icon', filename='icon.png') }}" alt="Logo">
+        <h1>WebShare File Sharing</h1>
+        
+        <div id="alert" class="alert"></div>
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" id="file-tab" onclick="switchTab('file')">Share Files</div>
+            <div class="tab" id="text-tab" onclick="switchTab('text')">Share Text</div>
+        </div>
+        
+        <!-- File Upload Tab -->
+        <div class="tab-content active" id="file-content">
+            <form id="upload-form" method="POST" enctype="multipart/form-data">
+                <div class="file-input-container">
+                    <input type="file" name="file" id="file-input" class="file-input">
+                    <label for="file-input" class="file-input-label">Choose File</label>
+                    <div id="selected-file" class="selected-file">No file selected</div>
+                </div>
+                <button type="submit" id="upload-btn" class="upload-btn" disabled>Upload</button>
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Text Sharing Tab -->
+        <div class="tab-content" id="text-content">
+            <form id="text-form">
+                <textarea class="text-area" id="shared-text" placeholder="Enter text to share..."></textarea>
+                <div class="clipboard-container">
+                    <button type="button" id="paste-btn" class="clipboard-btn" onclick="pasteFromClipboard()">Paste from Clipboard</button>
+                    <button type="submit" class="upload-btn">Share Text</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Shared Text Section (only visible when text is shared) -->
+        {% if shared_text %}
+        <div class="shared-text-container">
+            <h2>Shared Text</h2>
+            <div class="shared-text-header">
+                <span class="shared-text-title">{{ shared_text_title }}</span>
+                <button class="small-btn" onclick="copyToClipboard('shared-text-content')">Copy</button>
+            </div>
+            <pre id="shared-text-content" class="shared-text">{{ shared_text }}</pre>
+        </div>
+        {% endif %}
+        
+        <!-- Files Section -->
+        <div class="files-container">
+            <h2>Files</h2>
+            {% if files %}
+                <ul class="files-list">
+                    {% for filename, filesize in files %}
+                    <li class="file-item">
+                        <a href="{{ url_for('download_file', filename=filename) }}" class="file-link">{{ filename }}</a>
+                        <span class="file-size">{{ filesize }}</span>
+                        <button class="delete-btn" onclick="deleteFile('{{ filename }}')">Delete</button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-message">No files uploaded yet</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('file-input');
+            const selectedFile = document.getElementById('selected-file');
+            const uploadBtn = document.getElementById('upload-btn');
+            const uploadForm = document.getElementById('upload-form');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const alertBox = document.getElementById('alert');
+            const textForm = document.getElementById('text-form');
+            
+            // File upload handling
+            fileInput.addEventListener('change', function(e) {
+                if (fileInput.files.length > 0) {
+                    selectedFile.textContent = fileInput.files[0].name;
+                    uploadBtn.disabled = false;
+                } else {
+                    selectedFile.textContent = 'No file selected';
+                    uploadBtn.disabled = true;
+                }
+            });
+            
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', window.location.href, true);
+                
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = percentComplete + '%';
+                    }
+                });
+                
+                xhr.onloadstart = function() {
+                    progressContainer.style.display = 'block';
+                    uploadBtn.disabled = true;
+                };
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        showAlert('File uploaded successfully!', 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        showAlert('Error uploading file. Please try again.', 'error');
+                        uploadBtn.disabled = false;
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    showAlert('Network error. Please try again.', 'error');
+                    uploadBtn.disabled = false;
+                };
+                
+                xhr.send(formData);
+            });
+            
+            // Text sharing handling
+            textForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const text = document.getElementById('shared-text').value.trim();
+                if (!text) {
+                    showAlert('Please enter some text to share.', 'error');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('text', text);
+                
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/share_text', true);
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        showAlert('Text shared successfully!', 'success');
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        showAlert('Error sharing text. Please try again.', 'error');
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    showAlert('Network error. Please try again.', 'error');
+                };
+                
+                xhr.send(formData);
+            });
+            
+            function showAlert(message, type) {
+                alertBox.textContent = message;
+                alertBox.className = 'alert alert-' + type;
+                alertBox.style.display = 'block';
+                
+                setTimeout(function() {
+                    alertBox.style.display = 'none';
+                }, 3000);
+            }
+        });
+        
+        // Tab switching
+        function switchTab(tabName) {
+            const tabs = document.getElementsByClassName('tab');
+            const contents = document.getElementsByClassName('tab-content');
+            
+            for (let i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+            
+            for (let i = 0; i < contents.length; i++) {
+                contents[i].classList.remove('active');
+            }
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            document.getElementById(tabName + '-content').classList.add('active');
+        }
+        
+        // Clipboard operations
+        function pasteFromClipboard() {
+            navigator.clipboard.readText()
+                .then(text => {
+                    document.getElementById('shared-text').value = text;
+                })
+                .catch(err => {
+                    console.error('Failed to read clipboard: ', err);
+                    alert('Unable to access clipboard. Please paste manually.');
+                });
+        }
+        
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    const alertBox = document.getElementById('alert');
+                    alertBox.textContent = 'Copied to clipboard!';
+                    alertBox.className = 'alert alert-success';
+                    alertBox.style.display = 'block';
+                    
+                    setTimeout(function() {
+                        alertBox.style.display = 'none';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                    alert('Unable to copy to clipboard.');
+                });
+        }
+        
+        function deleteFile(filename) {
+            if (confirm('Are you sure you want to delete "' + filename + '"?')) {
+                fetch('/delete/' + encodeURIComponent(filename), {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Error deleting file');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Network error. Please try again.');
+                });
+            }
+        }
+    </script>
+</body>
+</html> 
