@@ -1,7 +1,7 @@
 import qrcode
 import base64
 import os
-from PyQt5.QtGui import QPixmap
+from PySide6.QtGui import QPixmap
 from qrcode.image.pure import PymagingImage  # Use a different image type
 
 def generate_qr_image(data, output_path='qr_code.png'):
