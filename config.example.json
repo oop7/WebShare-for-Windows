@@ -1,0 +1,55 @@
+{
+    "server": {
+        "host": "0.0.0.0",
+        "port": 5000,
+        "max_connections": 100,
+        "auto_open_browser": false
+    },
+    "upload": {
+        "max_file_size_mb": 100,
+        "max_total_size_mb": 10000,
+        "max_files": 1000,
+        "allowed_extensions": [],
+        "blocked_extensions": [
+            ".exe",
+            ".bat",
+            ".cmd",
+            ".sh",
+            ".ps1",
+            ".vbs",
+            ".scr",
+            ".com",
+            ".pif",
+            ".msi",
+            ".dll"
+        ],
+        "sanitize_filenames": true,
+        "allow_overwrite": false,
+        "use_whitelist": false
+    },
+    "storage": {
+        "upload_folder": "uploads"
+    },
+    "logging": {
+        "log_folder": "logs",
+        "log_level": "INFO"
+    },
+    "security": {
+        "password_protected": false,
+        "password": "",
+        "rate_limit_enabled": true,
+        "max_uploads_per_minute": 10
+    },
+    "qr_code": {
+        "show_on_start": true
+    },
+    "updates": {
+        "check_on_startup": true
+    },
+    "ui": {
+        "minimize_to_tray": true,
+        "start_minimized": false,
+        "start_server_on_launch": false,
+        "theme": "dark"
+    }
+}
