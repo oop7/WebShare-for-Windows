@@ -25,59 +25,94 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller
+        pip install cx_Freeze
     
-    - name: Build with PyInstaller
+    - name: Create cx_Freeze setup script
       run: |
-        pyinstaller --name WebShare-for-Windows `
-          --windowed `
-          --icon=app/templates/icon/icon48.png `
-          --add-data "app/templates;app/templates" `
-          --add-data "app/templates/icon;app/templates/icon" `
-          --add-data "config.example.json;." `
-          --hidden-import=PySide6.QtCore `
-          --hidden-import=PySide6.QtGui `
-          --hidden-import=PySide6.QtWidgets `
-          --hidden-import=waitress `
-          --hidden-import=flask `
-          --hidden-import=qrcode `
-          --hidden-import=PIL `
-          --exclude-module=numpy `
-          --exclude-module=pandas `
-          --exclude-module=matplotlib `
-          --exclude-module=scipy `
-          --exclude-module=tk `
-          --exclude-module=tkinter `
-          --exclude-module=PyQt5 `
-          --exclude-module=PyQt6 `
-          --strip `
-          --noupx `
-          --noconfirm `
-          main.py
+        New-Item -Path "setup_build.py" -ItemType File -Force
+        Add-Content -Path "setup_build.py" -Value "from cx_Freeze import setup, Executable"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "build_exe_options = dict("
+        Add-Content -Path "setup_build.py" -Value "    optimize=2,"
+        Add-Content -Path "setup_build.py" -Value "    packages=["
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtCore",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtGui",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtWidgets",'
+        Add-Content -Path "setup_build.py" -Value '        "flask",'
+        Add-Content -Path "setup_build.py" -Value '        "waitress",'
+        Add-Content -Path "setup_build.py" -Value '        "qrcode",'
+        Add-Content -Path "setup_build.py" -Value '        "PIL",'
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value "    excludes=["
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtBluetooth",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtNetwork",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtOpenGL",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtPrintSupport",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtSvg",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtTest",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtXml",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtSql",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtHelp",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtMultimedia",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtQml",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtQuick",'
+        Add-Content -Path "setup_build.py" -Value '        "PySide6.QtWebEngineCore",'
+        Add-Content -Path "setup_build.py" -Value '        "numpy",'
+        Add-Content -Path "setup_build.py" -Value '        "pandas",'
+        Add-Content -Path "setup_build.py" -Value '        "matplotlib",'
+        Add-Content -Path "setup_build.py" -Value '        "scipy",'
+        Add-Content -Path "setup_build.py" -Value '        "tkinter",'
+        Add-Content -Path "setup_build.py" -Value '        "PyQt5",'
+        Add-Content -Path "setup_build.py" -Value '        "PyQt6",'
+        Add-Content -Path "setup_build.py" -Value '        "unittest",'
+        Add-Content -Path "setup_build.py" -Value '        "test",'
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value "    include_files=["
+        Add-Content -Path "setup_build.py" -Value '        ("app/templates", "app/templates"),'
+        Add-Content -Path "setup_build.py" -Value '        ("config.example.json", "config.example.json"),'
+        Add-Content -Path "setup_build.py" -Value '        ("README.md", "README.md"),'
+        Add-Content -Path "setup_build.py" -Value '        ("LICENSE", "LICENSE"),'
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value ")"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "executables = ["
+        Add-Content -Path "setup_build.py" -Value "    Executable("
+        Add-Content -Path "setup_build.py" -Value '        script="main.py",'
+        Add-Content -Path "setup_build.py" -Value '        target_name="WebShare-for-Windows.exe",'
+        Add-Content -Path "setup_build.py" -Value '        base="Win32GUI",'
+        Add-Content -Path "setup_build.py" -Value '        icon="app/templates/icon/icon48.png",'
+        Add-Content -Path "setup_build.py" -Value "    )"
+        Add-Content -Path "setup_build.py" -Value "]"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "setup("
+        Add-Content -Path "setup_build.py" -Value '    name="WebShare-for-Windows",'
+        Add-Content -Path "setup_build.py" -Value '    version="1.3.0",'
+        Add-Content -Path "setup_build.py" -Value '    description="WebShare for Windows",'
+        Add-Content -Path "setup_build.py" -Value '    options={"build_exe": build_exe_options},'
+        Add-Content -Path "setup_build.py" -Value "    executables=executables,"
+        Add-Content -Path "setup_build.py" -Value ")"
     
-    - name: Copy additional files
+    - name: Build with cx_Freeze
       run: |
-        Copy-Item README.md dist/WebShare-for-Windows/
-        Copy-Item LICENSE dist/WebShare-for-Windows/
-        Copy-Item config.example.json dist/WebShare-for-Windows/
+        python setup_build.py build_exe --build-exe "dist\WebShare-for-Windows"
         New-Item -ItemType Directory -Force -Path dist/WebShare-for-Windows/uploads
         New-Item -ItemType Directory -Force -Path dist/WebShare-for-Windows/logs
     
     - name: Create portable package with 7-Zip
       run: |
-        7z a -t7z -mx=9 -mfb=64 -md=32m -ms=on WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.7z ./dist/WebShare-for-Windows/*
+        7z a -tzip -mx=9 WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip ./dist/WebShare-for-Windows/*
     
     - name: Calculate SHA256
       id: hash
       run: |
-        $hash = (Get-FileHash WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.7z -Algorithm SHA256).Hash
+        $hash = (Get-FileHash WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip -Algorithm SHA256).Hash
         echo "sha256=$hash" >> $env:GITHUB_OUTPUT
     
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         draft: true
-        files: WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.7z
+        files: WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip
         body: |
           ## WebShare for Windows ${{ github.ref_name }}
           - SHA256: ${{ steps.hash.outputs.sha256 }}
