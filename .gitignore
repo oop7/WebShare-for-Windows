@@ -28,6 +28,9 @@ env/
 # Application specific
 uploads/
 qr_code.png
+config.json
+logs/
+temp/
 logs/
 temp/
 config.json
