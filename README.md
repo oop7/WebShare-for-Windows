@@ -135,7 +135,6 @@ WebShare-for-Windows/
 ├── main.py                 # Main application entry point
 ├── README.md               # Project documentation
 ├── requirements.txt        # Python dependencies
-└── Run.bat                 # Windows batch script to run the app
 ```
 
 ## 📜 License
