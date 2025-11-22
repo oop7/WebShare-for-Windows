@@ -83,7 +83,22 @@ class Config:
                 print(f"Error loading config file: {e}")
                 print("Using default configuration")
         else:
-            # Create default config file
+            # Try to copy from config.example.json if it exists
+            app_dir = os.path.dirname(self.config_path)
+            example_config_path = os.path.join(app_dir, 'config.example.json')
+            
+            if os.path.exists(example_config_path):
+                try:
+                    print(f"Creating config.json from config.example.json...")
+                    with open(example_config_path, 'r', encoding='utf-8') as f:
+                        example_config = json.load(f)
+                        self._merge_config(example_config)
+                    print(f"✓ Configuration file created at {self.config_path}")
+                except Exception as e:
+                    print(f"Error reading example config: {e}")
+                    print("Using default configuration")
+            
+            # Save the config (either from example or defaults)
             self.save_config()
     
     def _merge_config(self, user_config: Dict[str, Any]) -> None:
