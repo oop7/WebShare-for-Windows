@@ -28,6 +28,10 @@ env/
 # Application specific
 uploads/
 qr_code.png
+logs/
+temp/
+config.json
+error_log.txt
 
 # OS specific
 .DS_Store
