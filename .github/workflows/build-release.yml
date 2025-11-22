@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+    
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --name WebShare-for-Windows `
+          --windowed `
+          --icon=app/templates/icon/icon48.png `
+          --add-data "app/templates;app/templates" `
+          --add-data "app/templates/icon;app/templates/icon" `
+          --add-data "config.example.json;." `
+          --hidden-import=PySide6.QtCore `
+          --hidden-import=PySide6.QtGui `
+          --hidden-import=PySide6.QtWidgets `
+          --hidden-import=waitress `
+          --hidden-import=flask `
+          --hidden-import=qrcode `
+          --hidden-import=PIL `
+          --collect-all PySide6 `
+          --noconfirm `
+          main.py
+    
+    - name: Copy additional files
+      run: |
+        Copy-Item README.md dist/WebShare-for-Windows/
+        Copy-Item LICENSE dist/WebShare-for-Windows/
+        Copy-Item config.example.json dist/WebShare-for-Windows/
+        New-Item -ItemType Directory -Force -Path dist/WebShare-for-Windows/uploads
+        New-Item -ItemType Directory -Force -Path dist/WebShare-for-Windows/logs
+    
+    - name: Create portable package
+      run: |
+        Compress-Archive -Path dist/WebShare-for-Windows/* -DestinationPath WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip
+    
+    - name: Calculate SHA256
+      id: hash
+      run: |
+        $hash = (Get-FileHash WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip -Algorithm SHA256).Hash
+        echo "sha256=$hash" >> $env:GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: true
+        files: WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip
+        body: |
+          ## WebShare for Windows ${{ github.ref_name }}
+          - SHA256: ${{ steps.hash.outputs.sha256 }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
