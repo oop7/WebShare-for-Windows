@@ -57,8 +57,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Alternatively, you can download the latest executable from the [Releases](https://github.com/oop7/WebShare-for-Windows/releases) section.
-
 ### **Usage**
 
 1. Click "Start WebShare Server" to launch the local server.
