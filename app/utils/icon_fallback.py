@@ -2,8 +2,8 @@
 Fallback icon utilities for WebShare
 """
 
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QBrush, QPen, QFont
-from PyQt5.QtCore import Qt, QSize
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QBrush, QPen, QFont
+from PySide6.QtCore import Qt, QSize
 
 def create_fallback_icon(size=64):
     """
