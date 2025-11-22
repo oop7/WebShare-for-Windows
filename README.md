@@ -36,7 +36,7 @@ WebShare for Windows is a file-sharing application that utilizes PySide6 (Qt6) f
 
 ## 📄 Requirements
 
-- Python 3.x
+- Python 3.10 or higher
 - See `requirements.txt` for a complete list of dependencies.
 
 ## 💻 Installation & Usage
