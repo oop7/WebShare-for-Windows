@@ -4,20 +4,23 @@ import threading
 import webbrowser
 import json
 import urllib.request
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QHBoxLayout, 
     QGroupBox, QCheckBox, QSpinBox, QFileDialog, QMessageBox, QProgressBar, 
-    QDesktopWidget, QFrame, QStatusBar, QDialog, QTextBrowser
+    QFrame, QStatusBar, QDialog, QTextBrowser, QSystemTrayIcon, QMenu
 )
-from PyQt5.QtGui import QPixmap, QIcon, QFont
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QSize, QObject, pyqtSlot
+from PySide6.QtGui import QPixmap, QIcon, QFont, QScreen, QAction
+from PySide6.QtCore import Qt, Signal, QTimer, QSize, QObject, Slot
 
 from app.utils import (
     get_local_ip, generate_qr_image, get_pixmap_from_base64,
     create_fallback_icon, get_fallback_icon
 )
-from app.server import UPLOAD_FOLDER, run_server
+from app.server import run_server
 from app.version import __version__, __author__
+from app.config import get_config
+from app.logger import get_logger
+from app.settings_dialog import SettingsDialog
 
 # Path to icon files
 ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'app', 'templates', 'icon')
@@ -25,9 +28,9 @@ WINDOW_ICON_PATH = os.path.join(ICON_PATH, 'icon48.png')
 
 class UpdateChecker(QObject):
     """Thread-safe update checker using Qt signals"""
-    update_available = pyqtSignal(str, str)
-    update_not_available = pyqtSignal()
-    update_error = pyqtSignal(str)
+    update_available = Signal(str, str)
+    update_not_available = Signal()
+    update_error = Signal(str)
     
     def check_for_updates(self):
         """Check for updates from GitHub repository"""
@@ -174,9 +177,24 @@ class WebShareApp(QWidget):
         super().__init__()
         self.server_running = False
         self.server_thread = None
-        self.host = "0.0.0.0"
-        self.port = 5000
+        
+        # Get configuration and logger
+        self.config = get_config()
+        self.logger = get_logger()
+        
+        # Server settings from config
+        self.host = self.config.get('server', 'host', '0.0.0.0')
+        self.port = self.config.get('server', 'port', 5000)
         self.url = ""
+        
+        # Upload folder from config
+        self.upload_folder = self.config.get('storage', 'upload_folder', 'uploads')
+        if not os.path.isabs(self.upload_folder):
+            self.upload_folder = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                self.upload_folder
+            )
+        
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_stats)
         
@@ -186,7 +204,11 @@ class WebShareApp(QWidget):
         self.update_checker.update_not_available.connect(self.on_update_not_available)
         self.update_checker.update_error.connect(self.on_update_error)
         
+        # System tray icon
+        self.tray_icon = None
+        
         self.initUI()
+        self.setup_system_tray()
 
     def initUI(self):
         """Initialize the user interface"""
@@ -195,10 +217,12 @@ class WebShareApp(QWidget):
         # Try to use the actual icon file for the window
         icon_path = WINDOW_ICON_PATH
         if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
+            self.app_icon = QIcon(icon_path)
+            self.setWindowIcon(self.app_icon)
         else:
             # Use fallback only if file doesn't exist
-            self.setWindowIcon(get_fallback_icon())
+            self.app_icon = get_fallback_icon()
+            self.setWindowIcon(self.app_icon)
             
         self.resize(600, 500)
         
@@ -216,39 +240,64 @@ class WebShareApp(QWidget):
         server_group = QGroupBox("Server Controls")
         server_layout = QVBoxLayout()
         
-        # Server controls - top row
-        controls_layout = QHBoxLayout()
+        # Server controls - organized in a form layout
+        controls_form = QHBoxLayout()
         
         # Start/Stop button
-        self.start_button = QPushButton("Start WebShare Server", self)
+        self.start_button = QPushButton("▶️ Start Server", self)
         self.start_button.clicked.connect(self.toggle_server)
-        controls_layout.addWidget(self.start_button)
+        self.start_button.setMinimumHeight(40)
+        self.start_button.setMinimumWidth(200)
+        controls_form.addWidget(self.start_button)
+        
+        controls_form.addSpacing(20)
         
         # Port selection
-        port_layout = QHBoxLayout()
         port_label = QLabel("Port:")
+        port_label.setStyleSheet("font-weight: bold;")
+        controls_form.addWidget(port_label)
+        
         self.port_spinner = QSpinBox()
         self.port_spinner.setRange(1024, 65535)
         self.port_spinner.setValue(5000)
+        self.port_spinner.setMinimumWidth(100)
+        self.port_spinner.setMinimumHeight(35)
+        self.port_spinner.setButtonSymbols(QSpinBox.ButtonSymbols.UpDownArrows)
+        self.port_spinner.setStyleSheet("""
+            QSpinBox {
+                padding: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                width: 20px;
+                height: 17px;
+            }
+        """)
         self.port_spinner.valueChanged.connect(self.update_port)
-        port_layout.addWidget(port_label)
-        port_layout.addWidget(self.port_spinner)
-        controls_layout.addLayout(port_layout)
+        controls_form.addWidget(self.port_spinner)
         
-        server_layout.addLayout(controls_layout)
+        controls_form.addStretch()
+        
+        server_layout.addLayout(controls_form)
         
         # Server status
         status_layout = QHBoxLayout()
+        status_layout.setSpacing(10)
+        
         status_label = QLabel("Status:")
+        status_label.setStyleSheet("font-weight: bold; min-width: 60px;")
         self.status_text = QLabel("Stopped")
-        self.status_text.setStyleSheet("color: #e74c3c;")
+        self.status_text.setStyleSheet("color: #e74c3c; font-weight: bold; padding: 5px; background-color: rgba(231, 76, 60, 0.1); border-radius: 3px;")
         status_layout.addWidget(status_label)
         status_layout.addWidget(self.status_text)
         status_layout.addStretch(1)
         
         # Server URL
         url_label = QLabel("URL:")
+        url_label.setStyleSheet("font-weight: bold; min-width: 40px;")
         self.url_text = QLabel("Not available")
+        self.url_text.setStyleSheet("color: #3498db; font-weight: bold; padding: 5px;")
         status_layout.addWidget(url_label)
         status_layout.addWidget(self.url_text)
         
@@ -306,21 +355,40 @@ class WebShareApp(QWidget):
         # Actions
         actions_group = QGroupBox("Actions")
         actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(8)
         
         # Open folder button
-        self.open_folder_button = QPushButton("Open Upload Folder", self)
+        self.open_folder_button = QPushButton("📁 Open Folder", self)
         self.open_folder_button.clicked.connect(self.open_folder)
+        self.open_folder_button.setMinimumHeight(35)
         actions_layout.addWidget(self.open_folder_button)
         
         # Clear files button
-        self.clear_files_button = QPushButton("Delete All Files", self)
+        self.clear_files_button = QPushButton("🗑️ Delete All", self)
         self.clear_files_button.clicked.connect(self.clear_files)
+        self.clear_files_button.setMinimumHeight(35)
         actions_layout.addWidget(self.clear_files_button)
         
         # Change folder button
-        self.change_folder_button = QPushButton("Change Upload Folder", self)
+        self.change_folder_button = QPushButton("📂 Change Folder", self)
         self.change_folder_button.clicked.connect(self.change_folder)
+        self.change_folder_button.setMinimumHeight(35)
         actions_layout.addWidget(self.change_folder_button)
+        
+        # Settings button
+        self.settings_button = QPushButton("⚙️ Settings", self)
+        self.settings_button.clicked.connect(self.show_settings)
+        self.settings_button.setMinimumHeight(35)
+        self.settings_button.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2ecc71;
+            }
+        """)
+        actions_layout.addWidget(self.settings_button)
         
         actions_group.setLayout(actions_layout)
         main_layout.addWidget(actions_group)
@@ -328,15 +396,18 @@ class WebShareApp(QWidget):
         # Help section
         help_group = QGroupBox("Help & Updates")
         help_layout = QHBoxLayout()
+        help_layout.setSpacing(8)
         
         # About button
-        self.about_button = QPushButton("About", self)
+        self.about_button = QPushButton("ℹ️ About", self)
         self.about_button.clicked.connect(self.show_about)
+        self.about_button.setMinimumHeight(35)
         help_layout.addWidget(self.about_button)
         
         # Check for updates button
-        self.update_button = QPushButton("Check for Updates", self)
+        self.update_button = QPushButton("🔄 Check Updates", self)
         self.update_button.clicked.connect(self.check_for_updates)
+        self.update_button.setMinimumHeight(35)
         help_layout.addWidget(self.update_button)
         
         help_group.setLayout(help_layout)
@@ -424,10 +495,10 @@ class WebShareApp(QWidget):
 
     def center_on_screen(self):
         """Center the window on the screen"""
-        qr = self.frameGeometry()
-        cp = QDesktopWidget().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.move(qr.topLeft())
+        screen = QApplication.primaryScreen().geometry()
+        window_geometry = self.frameGeometry()
+        window_geometry.moveCenter(screen.center())
+        self.move(window_geometry.topLeft())
 
     def update_port(self):
         """Update the port number"""
@@ -445,6 +516,7 @@ class WebShareApp(QWidget):
     def start_server(self):
         """Start the WebShare server"""
         try:
+            self.logger.info("Starting server...")
             local_ip = get_local_ip()
             self.url = f'http://{local_ip}:{self.port}'
             
@@ -473,12 +545,31 @@ class WebShareApp(QWidget):
             
             # Update UI
             self.server_running = True
-            self.start_button.setText("Stop Server")
-            self.status_text.setText("Running")
-            self.status_text.setStyleSheet("color: #2ecc71;")
+            self.start_button.setText("⏸️ Stop Server")
+            self.start_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c;
+                }
+                QPushButton:hover {
+                    background-color: #c0392b;
+                }
+            """)
+            self.status_text.setText("✅ Running")
+            self.status_text.setStyleSheet("color: #2ecc71; font-weight: bold; padding: 5px; background-color: rgba(46, 204, 113, 0.1); border-radius: 3px;")
             self.url_text.setText(self.url)
             self.port_spinner.setEnabled(False)
             self.status_bar.showMessage(f"Server started at {self.url}")
+            self.logger.log_server_start(self.host, self.port)
+            
+            # Update tray icon
+            if self.tray_icon:
+                self.tray_server_action.setText("Stop Server")
+                self.tray_icon.showMessage(
+                    "Server Started",
+                    f"WebShare server running at {self.url}",
+                    QSystemTrayIcon.Information,
+                    3000
+                )
             
             # Start stats timer
             self.update_stats()
@@ -491,9 +582,10 @@ class WebShareApp(QWidget):
         try:
             # Update UI
             self.server_running = False
-            self.start_button.setText("Start WebShare Server")
-            self.status_text.setText("Stopped")
-            self.status_text.setStyleSheet("color: #e74c3c;")
+            self.start_button.setText("▶️ Start Server")
+            self.start_button.setStyleSheet("")  # Reset to default
+            self.status_text.setText("⛔ Stopped")
+            self.status_text.setStyleSheet("color: #e74c3c; font-weight: bold; padding: 5px; background-color: rgba(231, 76, 60, 0.1); border-radius: 3px;")
             self.url_text.setText("Not available")
             self.port_spinner.setEnabled(True)
             self.status_bar.showMessage("Server stopped")
@@ -507,16 +599,31 @@ class WebShareApp(QWidget):
             
             # Clear QR code
             self.qr_label.clear()
+            
+            self.logger.log_server_stop()
+            
+            # Update tray icon
+            if self.tray_icon:
+                self.tray_server_action.setText("Start Server")
+                self.tray_icon.showMessage(
+                    "Server Stopped",
+                    "WebShare server has been stopped",
+                    QSystemTrayIcon.Information,
+                    2000
+                )
         except Exception as e:
+            self.logger.error(f"Error stopping server: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error stopping server: {str(e)}")
 
     def open_folder(self):
         """Open the upload folder in file explorer"""
-        folder_path = os.path.abspath(UPLOAD_FOLDER)
+        folder_path = os.path.abspath(self.upload_folder)
         try:
             os.startfile(folder_path)
             self.status_bar.showMessage(f"Opened folder: {folder_path}", 3000)
+            self.logger.info(f"Opened upload folder: {folder_path}")
         except Exception as e:
+            self.logger.error(f"Could not open folder: {str(e)}")
             QMessageBox.warning(self, "Error", f"Could not open folder: {str(e)}")
 
     def clear_files(self):
@@ -530,14 +637,17 @@ class WebShareApp(QWidget):
         if reply == QMessageBox.Yes:
             try:
                 deleted = 0
-                for filename in os.listdir(UPLOAD_FOLDER):
-                    file_path = os.path.join(UPLOAD_FOLDER, filename)
+                for filename in os.listdir(self.upload_folder):
+                    file_path = os.path.join(self.upload_folder, filename)
                     if os.path.isfile(file_path):
                         os.remove(file_path)
                         deleted += 1
+                        self.logger.log_delete(filename, "local")
                 self.status_bar.showMessage(f"Deleted {deleted} files", 3000)
+                self.logger.info(f"Cleared all files: {deleted} files deleted")
                 self.update_stats()
             except Exception as e:
+                self.logger.error(f"Could not delete files: {str(e)}")
                 QMessageBox.warning(self, "Error", f"Could not delete files: {str(e)}")
 
     def change_folder(self):
@@ -559,23 +669,24 @@ class WebShareApp(QWidget):
         """Update server statistics"""
         try:
             # Count files
-            files = [f for f in os.listdir(UPLOAD_FOLDER) 
-                    if os.path.isfile(os.path.join(UPLOAD_FOLDER, f))]
+            files = [f for f in os.listdir(self.upload_folder) 
+                    if os.path.isfile(os.path.join(self.upload_folder, f))]
             file_count = len(files)
             self.file_count_text.setText(str(file_count))
             
             # Calculate total size
             total_size = 0
             for filename in files:
-                file_path = os.path.join(UPLOAD_FOLDER, filename)
+                file_path = os.path.join(self.upload_folder, filename)
                 total_size += os.path.getsize(file_path)
                 
             # Convert to MB
             total_size_mb = total_size / (1024 * 1024)
             self.size_text.setText(f"{total_size_mb:.2f} MB")
             
-            # Update storage bar (arbitrary max of 1GB for demonstration)
-            max_storage = 1024  # 1GB in MB
+            # Get max storage from config and convert to MB
+            max_storage_bytes = self.config.get_max_total_size_bytes()
+            max_storage = max_storage_bytes / (1024 * 1024)
             storage_percent = min(100, (total_size_mb / max_storage) * 100)
             self.storage_bar.setValue(int(storage_percent))
             
@@ -588,12 +699,44 @@ class WebShareApp(QWidget):
                 self.storage_bar.setStyleSheet("QProgressBar::chunk { background-color: #e74c3c; }")
                 
         except Exception as e:
+            self.logger.error(f"Error updating stats: {str(e)}")
             self.status_bar.showMessage(f"Error updating stats: {str(e)}", 3000)
     
     def show_about(self):
         """Show the About dialog"""
         about_dialog = AboutDialog(self)
-        about_dialog.exec_()
+        about_dialog.exec()
+    
+    def show_settings(self):
+        """Show the Settings dialog"""
+        settings_dialog = SettingsDialog(self)
+        settings_dialog.settings_changed.connect(self.on_settings_changed)
+        if settings_dialog.exec():
+            self.logger.info("Settings saved by user")
+    
+    def on_settings_changed(self):
+        """Handle settings changes"""
+        # Reload config
+        self.config.load_config()
+        
+        # Update UI with new settings
+        self.host = self.config.get('server', 'host', '0.0.0.0')
+        self.port = self.config.get('server', 'port', 5000)
+        self.port_spinner.setValue(self.port)
+        
+        # Update upload folder
+        self.upload_folder = self.config.get('storage', 'upload_folder', 'uploads')
+        if not os.path.isabs(self.upload_folder):
+            self.upload_folder = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                self.upload_folder
+            )
+        
+        # Update stats to reflect new folder
+        self.update_stats()
+        
+        self.status_bar.showMessage("Settings applied successfully", 3000)
+        self.logger.info("Settings reloaded after user changes")
     
     def check_for_updates(self):
         """Check for updates from GitHub repository"""
@@ -607,7 +750,7 @@ class WebShareApp(QWidget):
         )
         update_thread.start()
     
-    @pyqtSlot(str, str)
+    @Slot(str, str)
     def on_update_available(self, version, url):
         """Slot called when an update is available"""
         self.status_bar.showMessage(f"New version {version} available!", 5000)
@@ -622,14 +765,98 @@ class WebShareApp(QWidget):
         if reply == QMessageBox.Yes and url:
             webbrowser.open(url)
     
-    @pyqtSlot()
+    @Slot()
     def on_update_not_available(self):
         """Slot called when no update is available"""
         self.status_bar.showMessage("You have the latest version!", 3000)
         self.update_button.setEnabled(True)
     
-    @pyqtSlot(str)
+    @Slot(str)
     def on_update_error(self, error_msg):
         """Slot called when there is an error checking for updates"""
         self.status_bar.showMessage(f"Error checking for updates: {error_msg}", 3000)
-        self.update_button.setEnabled(True) 
+        self.update_button.setEnabled(True)
+    
+    def setup_system_tray(self):
+        """Setup system tray icon and menu"""
+        if not self.config.get('ui', 'show_system_tray', True):
+            return
+        
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            self.logger.warning("System tray not available on this system")
+            return
+        
+        # Create system tray icon
+        self.tray_icon = QSystemTrayIcon(self.app_icon, self)
+        
+        # Create tray menu
+        tray_menu = QMenu()
+        
+        # Show/Hide action
+        show_action = QAction("Show", self)
+        show_action.triggered.connect(self.show)
+        tray_menu.addAction(show_action)
+        
+        hide_action = QAction("Hide", self)
+        hide_action.triggered.connect(self.hide)
+        tray_menu.addAction(hide_action)
+        
+        tray_menu.addSeparator()
+        
+        # Start/Stop server action
+        self.tray_server_action = QAction("Start Server", self)
+        self.tray_server_action.triggered.connect(self.toggle_server)
+        tray_menu.addAction(self.tray_server_action)
+        
+        tray_menu.addSeparator()
+        
+        # Quit action
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(self.quit_application)
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.tray_icon_activated)
+        
+        # Show tray icon
+        self.tray_icon.show()
+        self.tray_icon.showMessage(
+            "WebShare",
+            "Application running in system tray",
+            QSystemTrayIcon.Information,
+            2000
+        )
+    
+    def tray_icon_activated(self, reason):
+        """Handle tray icon activation"""
+        if reason == QSystemTrayIcon.DoubleClick:
+            if self.isVisible():
+                self.hide()
+            else:
+                self.show()
+                self.activateWindow()
+    
+    def closeEvent(self, event):
+        """Handle window close event"""
+        if self.tray_icon and self.config.get('ui', 'minimize_to_tray', True):
+            event.ignore()
+            self.hide()
+            if self.tray_icon:
+                self.tray_icon.showMessage(
+                    "WebShare",
+                    "Application minimized to tray. Double-click to restore.",
+                    QSystemTrayIcon.Information,
+                    2000
+                )
+        else:
+            self.quit_application()
+    
+    def quit_application(self):
+        """Quit the application"""
+        if self.server_running:
+            self.stop_server()
+        
+        if self.tray_icon:
+            self.tray_icon.hide()
+        
+        QApplication.quit() 
