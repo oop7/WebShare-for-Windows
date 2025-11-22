@@ -42,6 +42,16 @@ jobs:
           --hidden-import=flask `
           --hidden-import=qrcode `
           --hidden-import=PIL `
+          --exclude-module=numpy `
+          --exclude-module=pandas `
+          --exclude-module=matplotlib `
+          --exclude-module=scipy `
+          --exclude-module=tk `
+          --exclude-module=tkinter `
+          --exclude-module=PyQt5 `
+          --exclude-module=PyQt6 `
+          --strip `
+          --noupx `
           --noconfirm `
           main.py
     
@@ -53,21 +63,21 @@ jobs:
         New-Item -ItemType Directory -Force -Path dist/WebShare-for-Windows/uploads
         New-Item -ItemType Directory -Force -Path dist/WebShare-for-Windows/logs
     
-    - name: Create portable package
+    - name: Create portable package with 7-Zip
       run: |
-        Compress-Archive -Path dist/WebShare-for-Windows/* -DestinationPath WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip
+        7z a -t7z -mx=9 -mfb=64 -md=32m -ms=on WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.7z ./dist/WebShare-for-Windows/*
     
     - name: Calculate SHA256
       id: hash
       run: |
-        $hash = (Get-FileHash WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip -Algorithm SHA256).Hash
+        $hash = (Get-FileHash WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.7z -Algorithm SHA256).Hash
         echo "sha256=$hash" >> $env:GITHUB_OUTPUT
     
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         draft: true
-        files: WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.zip
+        files: WebShare-for-Windows-${{ github.ref_name }}-Windows-Portable.7z
         body: |
           ## WebShare for Windows ${{ github.ref_name }}
           - SHA256: ${{ steps.hash.outputs.sha256 }}
