@@ -42,7 +42,6 @@ jobs:
           --hidden-import=flask `
           --hidden-import=qrcode `
           --hidden-import=PIL `
-          --collect-all PySide6 `
           --noconfirm `
           main.py
     
