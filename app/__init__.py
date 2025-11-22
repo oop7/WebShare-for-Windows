@@ -9,7 +9,7 @@ from app.version import __version__, __author__
 from app.utils import get_local_ip, generate_qr_image, get_pixmap_from_base64
 
 # Then import server functionality
-from app.server import app, run_server, UPLOAD_FOLDER
+from app.server import app, run_server
 
 # Finally import the GUI class
 from app.gui import WebShareApp
