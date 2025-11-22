@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebShare - Login</title>
+    <link rel="icon" href="{{ url_for('get_icon', filename='icon48.png') }}" type="image/png">
+    <style>
+        body {
+            background-color: #11171d;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-container {
+            max-width: 400px;
+            width: 100%;
+            padding: 40px;
+            background-color: #1e2730;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        img.logo {
+            max-width: 100px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        p {
+            color: #a0aec0;
+            margin-bottom: 30px;
+        }
+        .error {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            background-color: #2c3440;
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #3182ce;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #ffffff;
+            color: #11171d;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #e2e8f0;
+        }
+        .footer {
+            margin-top: 20px;
+            color: #718096;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="{{ url_for('get_icon', filename='icon.png') }}" alt="WebShare" class="logo" onerror="this.style.display='none'">
+        <h1>WebShare</h1>
+        <p>Enter password to access file sharing</p>
+        
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <input type="password" name="password" placeholder="Enter password" required autofocus>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        
+        <div class="footer">
+            Protected by WebShare for Windows
+        </div>
+    </div>
+</body>
+</html>
