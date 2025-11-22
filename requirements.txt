@@ -1,6 +1,9 @@
 qrcode[pil]
-PyQt5
+PySide6
 Flask
 humanize
 urllib3
+waitress
+pytest
+pytest-cov
 
