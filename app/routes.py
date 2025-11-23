@@ -6,7 +6,7 @@ Organized route handlers for the web interface
 import os
 import uuid
 from datetime import datetime
-from flask import request, send_from_directory, render_template, jsonify, redirect, url_for, session
+from flask import request, send_from_directory, send_file, render_template, jsonify, redirect, url_for, session
 from werkzeug.utils import secure_filename
 
 from app.config import get_config
@@ -32,6 +32,13 @@ shared_texts = {}
 def get_upload_folder():
     """Get the configured upload folder path"""
     folder = config.get('storage', 'upload_folder', 'uploads')
+    
+    # Convert to absolute path relative to project root (not app/ directory)
+    if not os.path.isabs(folder):
+        # Get project root (parent of app directory)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        folder = os.path.join(project_root, folder)
+    
     if not os.path.exists(folder):
         os.makedirs(folder)
     return folder
@@ -240,8 +247,10 @@ def register_routes(app):
                 return jsonify({'success': False, 'error': 'File not found'}), 404
             
             logger.log_download(filename, request.remote_addr)
-            
-            return send_from_directory(upload_folder, filename, as_attachment=True)
+
+            # Use absolute path when sending the file to avoid issues
+            # with relative directories and server working directory.
+            return send_file(file_path, as_attachment=True)
         except Exception as e:
             logger.error(f"Error during file download: {str(e)}", exc_info=True)
             return jsonify({'success': False, 'error': 'An error occurred'}), 500
