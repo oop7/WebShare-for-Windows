@@ -1,5 +1,12 @@
 # WebShare for Windows
 
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/oop7/WebShare-for-Windows/releases)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://github.com/oop7/WebShare-for-Windows)
+[![PySide6](https://img.shields.io/badge/GUI-PySide6-41CD52.svg)](https://pypi.org/project/PySide6/)
+[![Flask](https://img.shields.io/badge/Backend-Flask-000000.svg)](https://flask.palletsprojects.com/)
+
 WebShare for Windows is a file-sharing application that utilizes PySide6 (Qt6) for a dark mode GUI and Flask for a local web server. Users can upload and download files easily through a web interface, with QR code support for quick access.
 
 ## 💪 Features
@@ -38,12 +45,7 @@ WebShare for Windows is a file-sharing application that utilizes PySide6 (Qt6) f
 - **Configuration System**: JSON-based configuration file for easy customization
 - **Error Handling**: Improved error handling with user-friendly messages
 
-## 📄 Requirements
-
-- Python 3.10 or higher
-- See `requirements.txt` for a complete list of dependencies.
-
-## 💻 Installation & Usage
+##  Installation & Usage
 
 ### Option 1: Download Installer (Recommended)
 
