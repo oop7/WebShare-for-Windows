@@ -101,15 +101,24 @@ jobs:
         Add-Content -Path "setup_build.py" -Value "        'PySide6.QtQml',"
         Add-Content -Path "setup_build.py" -Value "        'PySide6.QtQuick',"
         Add-Content -Path "setup_build.py" -Value "        'PySide6.QtWebEngineCore',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.Qt3DCore',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.Qt3DRender',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtCharts',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtDataVisualization',"
         Add-Content -Path "setup_build.py" -Value "        'unittest',"
         Add-Content -Path "setup_build.py" -Value "        'test',"
         Add-Content -Path "setup_build.py" -Value "        'tests',"
         Add-Content -Path "setup_build.py" -Value "        'pytest',"
+        Add-Content -Path "setup_build.py" -Value "        'pytest_cov',"
+        Add-Content -Path "setup_build.py" -Value "        'coverage',"
         Add-Content -Path "setup_build.py" -Value "        'numpy',"
         Add-Content -Path "setup_build.py" -Value "        'scipy',"
         Add-Content -Path "setup_build.py" -Value "        'pandas',"
         Add-Content -Path "setup_build.py" -Value "        'matplotlib',"
         Add-Content -Path "setup_build.py" -Value "        'tkinter',"
+        Add-Content -Path "setup_build.py" -Value "        'email',"
+        Add-Content -Path "setup_build.py" -Value "        'xml',"
+        Add-Content -Path "setup_build.py" -Value "        'pydoc',"
         Add-Content -Path "setup_build.py" -Value "    ],"
         Add-Content -Path "setup_build.py" -Value "    'include_files': ["
         Add-Content -Path "setup_build.py" -Value "        ('app/templates', 'lib/app/templates'),"
@@ -138,8 +147,6 @@ jobs:
         Add-Content -Path "setup_build.py" -Value "            base=base,"
         Add-Content -Path "setup_build.py" -Value "            target_name='WebShare.exe',"
         Add-Content -Path "setup_build.py" -Value "            icon=icon_path,"
-        Add-Content -Path "setup_build.py" -Value "            shortcut_name='WebShare for Windows',"
-        Add-Content -Path "setup_build.py" -Value "            shortcut_dir='DesktopFolder',"
         Add-Content -Path "setup_build.py" -Value "        )"
         Add-Content -Path "setup_build.py" -Value "    ],"
         Add-Content -Path "setup_build.py" -Value ")"
@@ -173,9 +180,14 @@ jobs:
         Write-Host "Files in dist directory:"
         Get-ChildItem -Path "dist\WebShare" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
 
-        # Create ZIP
-        $zipName = "WebShare-v$version-Windows-portable.zip"
-        Compress-Archive -Path "dist\WebShare\*" -DestinationPath "artifacts\$zipName" -CompressionLevel Optimal
+        # Rename dist folder to WebShare-v{version}
+        $folderName = "WebShare-v$version"
+        if (Test-Path $folderName) { Remove-Item $folderName -Recurse -Force }
+        Rename-Item "dist\WebShare" $folderName
+        
+        # Create ZIP from the renamed folder
+        $zipName = "$folderName-Windows-portable.zip"
+        Compress-Archive -Path "$folderName\*" -DestinationPath "artifacts\$zipName" -CompressionLevel Optimal
         Write-Host "Created: artifacts\$zipName"
         
         # Show file size
@@ -191,16 +203,16 @@ jobs:
         retention-days: 90
 
     - name: Create GitHub Release
-      if: startsWith(github.ref, 'refs/tags/')
+      if: github.event.inputs.version != '' && github.event.inputs.version != 'dev'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref_name }}
-        name: WebShare for Windows ${{ github.ref_name }}
+        tag_name: v${{ steps.get_version.outputs.VERSION }}
+        name: WebShare for Windows v${{ steps.get_version.outputs.VERSION }}
         draft: true
         prerelease: false
         generate_release_notes: true
         body: |
-          # WebShare for Windows ${{ github.ref_name }}
+          # WebShare for Windows v${{ steps.get_version.outputs.VERSION }}
           
           ## Download
           

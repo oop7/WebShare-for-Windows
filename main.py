@@ -67,10 +67,18 @@ def main():
         logger = get_logger()
         logger.info(f"Starting WebShare for Windows v{__version__}")
         
+        # Determine base directory (handle frozen executable)
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            # Running as script
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        
         # Make sure required directories exist
         upload_dir = config.get('storage', 'upload_folder', 'uploads')
         if not os.path.isabs(upload_dir):
-            upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), upload_dir)
+            upload_dir = os.path.join(base_dir, upload_dir)
         
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
@@ -78,7 +86,7 @@ def main():
         
         temp_dir = config.get('storage', 'temp_folder', 'temp')
         if not os.path.isabs(temp_dir):
-            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), temp_dir)
+            temp_dir = os.path.join(base_dir, temp_dir)
         
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
