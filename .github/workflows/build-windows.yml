@@ -180,14 +180,9 @@ jobs:
         Write-Host "Files in dist directory:"
         Get-ChildItem -Path "dist\WebShare" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
 
-        # Rename dist folder to WebShare-v{version}
-        $folderName = "WebShare-v$version"
-        if (Test-Path $folderName) { Remove-Item $folderName -Recurse -Force }
-        Rename-Item "dist\WebShare" $folderName
-        
-        # Create ZIP from the renamed folder
-        $zipName = "$folderName-Windows-portable.zip"
-        Compress-Archive -Path "$folderName\*" -DestinationPath "artifacts\$zipName" -CompressionLevel Optimal
+        # Create ZIP directly from dist\WebShare contents
+        $zipName = "WebShare-v$version-Windows-portable.zip"
+        Compress-Archive -Path "dist\WebShare\*" -DestinationPath "artifacts\$zipName" -CompressionLevel Optimal
         Write-Host "Created: artifacts\$zipName"
         
         # Show file size
