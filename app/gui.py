@@ -190,10 +190,13 @@ class WebShareApp(QWidget):
         # Upload folder from config
         self.upload_folder = self.config.get('storage', 'upload_folder', 'uploads')
         if not os.path.isabs(self.upload_folder):
-            self.upload_folder = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                self.upload_folder
-            )
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                # Running as script
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.upload_folder = os.path.join(base_dir, self.upload_folder)
         
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_stats)
@@ -660,12 +663,12 @@ class WebShareApp(QWidget):
     def change_folder(self):
         """Change the upload folder location"""
         folder = QFileDialog.getExistingDirectory(
-            self, "Select Upload Folder", os.path.abspath(UPLOAD_FOLDER)
+            self, "Select Upload Folder", os.path.abspath(self.upload_folder)
         )
         
         if folder:
             # Note: This is a simple implementation. In a real app, we would need
-            # to update the global UPLOAD_FOLDER and restart the server.
+            # to update the config and restart the server.
             QMessageBox.information(
                 self, "Information", 
                 "Changing folders is not fully implemented in this version."
@@ -734,10 +737,13 @@ class WebShareApp(QWidget):
         # Update upload folder
         self.upload_folder = self.config.get('storage', 'upload_folder', 'uploads')
         if not os.path.isabs(self.upload_folder):
-            self.upload_folder = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                self.upload_folder
-            )
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                # Running as script
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.upload_folder = os.path.join(base_dir, self.upload_folder)
         
         # Update stats to reflect new folder
         self.update_stats()
