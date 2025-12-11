@@ -1,0 +1,213 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (leave empty for dev build)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    
+    - name: Extract version from tag
+      id: get_version
+      shell: powershell
+      run: |
+        # Priority: manual input > tag > default 'dev'
+        if ("${{ github.event.inputs.version }}" -ne "") {
+          $version = "${{ github.event.inputs.version }}"
+        } elseif ("${{ github.ref_name }}" -match '^v') {
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+        } else {
+          $version = "dev"
+        }
+        Write-Host "Extracted version: $version"
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Cache Python dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      shell: powershell
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install cx_Freeze
+
+    - name: Create cx_Freeze setup script
+      shell: powershell
+      run: |
+        # Create setup script for cx_Freeze
+        New-Item -Path "setup_build.py" -ItemType File -Force
+        Add-Content -Path "setup_build.py" -Value "import sys"
+        Add-Content -Path "setup_build.py" -Value "import os"
+        Add-Content -Path "setup_build.py" -Value "from cx_Freeze import setup, Executable"
+        Add-Content -Path "setup_build.py" -Value "from app.version import __version__, __author__"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "build_exe_options = {"
+        Add-Content -Path "setup_build.py" -Value "    'packages': ["
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtCore',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtGui',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtWidgets',"
+        Add-Content -Path "setup_build.py" -Value "        'flask',"
+        Add-Content -Path "setup_build.py" -Value "        'qrcode',"
+        Add-Content -Path "setup_build.py" -Value "        'PIL',"
+        Add-Content -Path "setup_build.py" -Value "        'humanize',"
+        Add-Content -Path "setup_build.py" -Value "        'urllib3',"
+        Add-Content -Path "setup_build.py" -Value "        'waitress',"
+        Add-Content -Path "setup_build.py" -Value "        'werkzeug',"
+        Add-Content -Path "setup_build.py" -Value "        'jinja2',"
+        Add-Content -Path "setup_build.py" -Value "        'click',"
+        Add-Content -Path "setup_build.py" -Value "        'markupsafe',"
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value "    'excludes': ["
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtBluetooth',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtNetwork',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtOpenGL',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtPrintSupport',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtSvg',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtTest',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtXml',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtSql',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtHelp',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtMultimedia',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtQml',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtQuick',"
+        Add-Content -Path "setup_build.py" -Value "        'PySide6.QtWebEngineCore',"
+        Add-Content -Path "setup_build.py" -Value "        'unittest',"
+        Add-Content -Path "setup_build.py" -Value "        'test',"
+        Add-Content -Path "setup_build.py" -Value "        'tests',"
+        Add-Content -Path "setup_build.py" -Value "        'pytest',"
+        Add-Content -Path "setup_build.py" -Value "        'numpy',"
+        Add-Content -Path "setup_build.py" -Value "        'scipy',"
+        Add-Content -Path "setup_build.py" -Value "        'pandas',"
+        Add-Content -Path "setup_build.py" -Value "        'matplotlib',"
+        Add-Content -Path "setup_build.py" -Value "        'tkinter',"
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value "    'include_files': ["
+        Add-Content -Path "setup_build.py" -Value "        ('app/templates', 'lib/app/templates'),"
+        Add-Content -Path "setup_build.py" -Value "        ('config.example.json', 'config.example.json'),"
+        Add-Content -Path "setup_build.py" -Value "        ('README.md', 'README.md'),"
+        Add-Content -Path "setup_build.py" -Value "        ('LICENSE', 'LICENSE'),"
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value "    'optimize': 2,"
+        Add-Content -Path "setup_build.py" -Value "}"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "base = 'gui' if sys.platform == 'win32' else None"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "icon_path = 'app/templates/icon/icon.ico'"
+        Add-Content -Path "setup_build.py" -Value "if not os.path.exists(icon_path):"
+        Add-Content -Path "setup_build.py" -Value "    icon_path = None"
+        Add-Content -Path "setup_build.py" -Value ""
+        Add-Content -Path "setup_build.py" -Value "setup("
+        Add-Content -Path "setup_build.py" -Value "    name='WebShare',"
+        Add-Content -Path "setup_build.py" -Value "    version=__version__,"
+        Add-Content -Path "setup_build.py" -Value "    description='WebShare for Windows - Local Network File Sharing',"
+        Add-Content -Path "setup_build.py" -Value "    author=__author__,"
+        Add-Content -Path "setup_build.py" -Value "    options={'build_exe': build_exe_options},"
+        Add-Content -Path "setup_build.py" -Value "    executables=["
+        Add-Content -Path "setup_build.py" -Value "        Executable("
+        Add-Content -Path "setup_build.py" -Value "            script='main.py',"
+        Add-Content -Path "setup_build.py" -Value "            base=base,"
+        Add-Content -Path "setup_build.py" -Value "            target_name='WebShare.exe',"
+        Add-Content -Path "setup_build.py" -Value "            icon=icon_path,"
+        Add-Content -Path "setup_build.py" -Value "            shortcut_name='WebShare for Windows',"
+        Add-Content -Path "setup_build.py" -Value "            shortcut_dir='DesktopFolder',"
+        Add-Content -Path "setup_build.py" -Value "        )"
+        Add-Content -Path "setup_build.py" -Value "    ],"
+        Add-Content -Path "setup_build.py" -Value ")"
+
+    - name: Build executable
+      shell: powershell
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        Write-Host "Building WebShare v$version ..."
+        
+        # Build executable using generated setup script
+        python setup_build.py build_exe --build-exe "dist\WebShare"
+        
+        Write-Host "Build completed successfully"
+    
+    - name: Package release artifact (ZIP)
+      shell: powershell
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        
+        Write-Host "Preparing ZIP artifact for version: $version"
+        New-Item -ItemType Directory -Path "artifacts" -Force
+        
+        # Verify dist directory exists
+        if (-not (Test-Path "dist\WebShare")) {
+          Write-Host "Error: Build output not found!"
+          exit 1
+        }
+
+        # List contents
+        Write-Host "Files in dist directory:"
+        Get-ChildItem -Path "dist\WebShare" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+
+        # Create ZIP
+        $zipName = "WebShare-v$version-Windows-portable.zip"
+        Compress-Archive -Path "dist\WebShare\*" -DestinationPath "artifacts\$zipName" -CompressionLevel Optimal
+        Write-Host "Created: artifacts\$zipName"
+        
+        # Show file size
+        $zipFile = Get-Item "artifacts\$zipName"
+        $sizeMB = [math]::Round($zipFile.Length / 1MB, 2)
+        Write-Host "Package size: $sizeMB MB"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: WebShare-Windows-${{ steps.get_version.outputs.VERSION }}
+        path: artifacts/*
+        retention-days: 90
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: WebShare for Windows ${{ github.ref_name }}
+        draft: true
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          # WebShare for Windows ${{ github.ref_name }}
+          
+          ## Download
+          
+          Download the portable ZIP file below and extract it to run the application.
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.ref_name }}
+        files: |
+          artifacts/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
