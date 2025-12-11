@@ -31,13 +31,19 @@ shared_texts = {}
 
 def get_upload_folder():
     """Get the configured upload folder path"""
+    import sys
+    
     folder = config.get('storage', 'upload_folder', 'uploads')
     
-    # Convert to absolute path relative to project root (not app/ directory)
+    # Convert to absolute path relative to executable location (for frozen app) or project root
     if not os.path.isabs(folder):
-        # Get project root (parent of app directory)
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        folder = os.path.join(project_root, folder)
+        if getattr(sys, 'frozen', False):
+            # Running as compiled executable - use exe directory
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            # Running as script - use project root (parent of app directory)
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        folder = os.path.join(base_dir, folder)
     
     if not os.path.exists(folder):
         os.makedirs(folder)
