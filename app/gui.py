@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QGroupBox, QCheckBox, QSpinBox, QFileDialog, QMessageBox, QProgressBar, 
     QFrame, QStatusBar, QDialog, QTextBrowser, QSystemTrayIcon, QMenu
 )
-from PySide6.QtGui import QPixmap, QIcon, QFont, QScreen, QAction
+from PySide6.QtGui import QPixmap, QIcon, QFont, QScreen, QAction, QCursor
 from PySide6.QtCore import Qt, Signal, QTimer, QSize, QObject, Slot
 
 from app.utils import (
@@ -297,9 +297,20 @@ class WebShareApp(QWidget):
         url_label = QLabel("URL:")
         url_label.setStyleSheet("font-weight: bold; min-width: 40px;")
         self.url_text = QLabel("Not available")
-        self.url_text.setStyleSheet("color: #3498db; font-weight: bold; padding: 5px;")
+        self.url_text.setStyleSheet("color: #3498db; font-weight: bold; padding: 5px; text-decoration: underline;")
+        self.url_text.setCursor(QCursor(Qt.PointingHandCursor))
+        self.url_text.mousePressEvent = lambda event: self.open_url_in_browser()
         status_layout.addWidget(url_label)
         status_layout.addWidget(self.url_text)
+        
+        # Copy URL button
+        self.copy_url_button = QPushButton("📋")
+        self.copy_url_button.setToolTip("Copy URL to clipboard")
+        self.copy_url_button.setMaximumWidth(35)
+        self.copy_url_button.setMaximumHeight(30)
+        self.copy_url_button.clicked.connect(self.copy_url_to_clipboard)
+        self.copy_url_button.setVisible(False)  # Hidden until server starts
+        status_layout.addWidget(self.copy_url_button)
         
         server_layout.addLayout(status_layout)
         server_group.setLayout(server_layout)
@@ -557,6 +568,7 @@ class WebShareApp(QWidget):
             self.status_text.setText("✅ Running")
             self.status_text.setStyleSheet("color: #2ecc71; font-weight: bold; padding: 5px; background-color: rgba(46, 204, 113, 0.1); border-radius: 3px;")
             self.url_text.setText(self.url)
+            self.copy_url_button.setVisible(True)  # Show copy button when server starts
             self.port_spinner.setEnabled(False)
             self.status_bar.showMessage(f"Server started at {self.url}")
             self.logger.log_server_start(self.host, self.port)
@@ -566,9 +578,9 @@ class WebShareApp(QWidget):
                 self.tray_server_action.setText("Stop Server")
                 self.tray_icon.showMessage(
                     "Server Started",
-                    f"WebShare server running at {self.url}",
+                    f"Running at {self.url}",
                     QSystemTrayIcon.Information,
-                    3000
+                    1500
                 )
             
             # Start stats timer
@@ -587,6 +599,7 @@ class WebShareApp(QWidget):
             self.status_text.setText("⛔ Stopped")
             self.status_text.setStyleSheet("color: #e74c3c; font-weight: bold; padding: 5px; background-color: rgba(231, 76, 60, 0.1); border-radius: 3px;")
             self.url_text.setText("Not available")
+            self.copy_url_button.setVisible(False)  # Hide copy button when server stops
             self.port_spinner.setEnabled(True)
             self.status_bar.showMessage("Server stopped")
             
@@ -605,12 +618,6 @@ class WebShareApp(QWidget):
             # Update tray icon
             if self.tray_icon:
                 self.tray_server_action.setText("Start Server")
-                self.tray_icon.showMessage(
-                    "Server Stopped",
-                    "WebShare server has been stopped",
-                    QSystemTrayIcon.Information,
-                    2000
-                )
         except Exception as e:
             self.logger.error(f"Error stopping server: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error stopping server: {str(e)}")
@@ -792,14 +799,10 @@ class WebShareApp(QWidget):
         # Create tray menu
         tray_menu = QMenu()
         
-        # Show/Hide action
-        show_action = QAction("Show", self)
-        show_action.triggered.connect(self.show)
-        tray_menu.addAction(show_action)
-        
-        hide_action = QAction("Hide", self)
-        hide_action.triggered.connect(self.hide)
-        tray_menu.addAction(hide_action)
+        # Show uploads action
+        show_uploads_action = QAction("Show Uploads", self)
+        show_uploads_action.triggered.connect(self.open_folder)
+        tray_menu.addAction(show_uploads_action)
         
         tray_menu.addSeparator()
         
@@ -820,12 +823,6 @@ class WebShareApp(QWidget):
         
         # Show tray icon
         self.tray_icon.show()
-        self.tray_icon.showMessage(
-            "WebShare",
-            "Application running in system tray",
-            QSystemTrayIcon.Information,
-            2000
-        )
     
     def tray_icon_activated(self, reason):
         """Handle tray icon activation"""
@@ -844,12 +841,35 @@ class WebShareApp(QWidget):
             if self.tray_icon:
                 self.tray_icon.showMessage(
                     "WebShare",
-                    "Application minimized to tray. Double-click to restore.",
+                    "Minimized to tray",
                     QSystemTrayIcon.Information,
-                    2000
+                    1500
                 )
         else:
             self.quit_application()
+    
+    def open_url_in_browser(self):
+        """Open the server URL in the default web browser"""
+        if self.server_running and self.url:
+            try:
+                webbrowser.open(self.url)
+                self.status_bar.showMessage(f"Opening {self.url} in browser...", 2000)
+                self.logger.info(f"Opened URL in browser: {self.url}")
+            except Exception as e:
+                self.logger.error(f"Could not open URL in browser: {str(e)}")
+                QMessageBox.warning(self, "Error", f"Could not open URL in browser: {str(e)}")
+    
+    def copy_url_to_clipboard(self):
+        """Copy the server URL to clipboard"""
+        if self.server_running and self.url:
+            try:
+                clipboard = QApplication.clipboard()
+                clipboard.setText(self.url)
+                self.status_bar.showMessage("URL copied to clipboard!", 2000)
+                self.logger.info("URL copied to clipboard")
+            except Exception as e:
+                self.logger.error(f"Could not copy URL to clipboard: {str(e)}")
+                QMessageBox.warning(self, "Error", f"Could not copy URL to clipboard: {str(e)}")
     
     def quit_application(self):
         """Quit the application"""
